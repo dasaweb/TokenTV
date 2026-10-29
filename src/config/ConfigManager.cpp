@@ -200,6 +200,11 @@ auto ConfigManager::save() -> bool {
     secure.put("wifi_ssid", this->getSSID());
     secure.put("wifi_password", this->getPassword());
 
+    // Without this a token changed via the API or rescue mode is lost on the next reboot
+    if (!this->api_token.empty()) {
+        secure.put("api_token", this->getApiToken());
+    }
+
     doc["lcd_rotation"] = lcd_rotation;
     if (!this->ntp_server.empty()) {
         doc["ntp_server"] = this->ntp_server.c_str();

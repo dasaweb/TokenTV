@@ -36,6 +36,17 @@ static constexpr size_t KEY_LEN = 32;
 static String kvSalt;
 
 /**
+ * @brief Keeps the EEPROM RAM mirror allocated only while it is used (frees 2 KB heap otherwise)
+ */
+class EepromSession {
+   public:
+    explicit EepromSession(size_t size) { EEPROM.begin(static_cast<int>(size)); }
+    ~EepromSession() { EEPROM.end(); }
+    EepromSession(const EepromSession&) = delete;
+    auto operator=(const EepromSession&) -> EepromSession& = delete;
+};
+
+/**
  * @brief Set the public salt used in key derivation
  *
  * @param salt The public salt string
@@ -71,8 +82,6 @@ SecureStorage::SecureStorage(size_t eepromSize) : _eepromSize(eepromSize), _doc(
  */
 auto SecureStorage::begin() -> bool {
     Logger::info("EEPROM init start", "SecureStorage");
-
-    EEPROM.begin(static_cast<int>(_eepromSize));
 
     if (!loadToMemory()) {
         Logger::warn("No existing NVS data found, initializing new storage", "SecureStorage");
@@ -111,6 +120,8 @@ auto const SecureStorage::loadToMemory() -> bool {
     if (_eepromSize <= headerSize) {
         return false;
     }
+
+    const EepromSession session(_eepromSize);
 
     for (size_t i = 0; i < 4; ++i) {
         if (EEPROM.read((int)i) != NVS_MAGIC[i]) {
@@ -170,6 +181,7 @@ auto const SecureStorage::loadToMemory() -> bool {
 auto const SecureStorage::flushToEEPROM() -> bool {
     const size_t headerSize = 6;
     size_t payloadMax = _eepromSize - headerSize;
+    const EepromSession session(_eepromSize);
 
     String out;
     out.reserve(static_cast<int>(payloadMax));

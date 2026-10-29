@@ -1,4 +1,7 @@
-# Geekmagic open firmware
+# GeekMagic Open Firmware (upstream documentation)
+
+> This is the original README of [Times-Z/GeekMagic-Open-Firmware](https://github.com/Times-Z/GeekMagic-Open-Firmware), kept for the hardware, flashing and rescue-mode details. TokenTV builds on top of it.
+
 
 > This repo documents the LCD interface inside the **HelloCubic Lite** cube (ESP8266) from [GeekMagicClock](https://github.com/GeekMagicClock/HelloCubic-Lite)
 
@@ -8,7 +11,7 @@
 [![Build status main](https://img.shields.io/github/actions/workflow/status/Times-Z/GeekMagic-Open-Firmware/.github/workflows/ci.yml?branch=main&label=Pipeline%20Status%20main&style=for-the-badge&logo=star)](https://github.com/Times-Z/GeekMagic-Open-Firmware/actions)
 
 [![Build status develop](https://img.shields.io/github/actions/workflow/status/Times-Z/GeekMagic-Open-Firmware/.github/workflows/ci.yml?branch=develop&label=Pipeline%20Status%20develop&style=for-the-badge&logo=star)](https://github.com/Times-Z/GeekMagic-Open-Firmware/actions)
-[![License: GPLV3](https://img.shields.io/badge/License-GPLV3-yellow.svg?style=for-the-badge)](LICENSE)
+[![License: GPLV3](https://img.shields.io/badge/License-GPLV3-yellow.svg?style=for-the-badge)](../LICENSE)
 
 ## Table of Contents
 
@@ -30,8 +33,8 @@
 - [Support](#support)
 
 <div align="center">
-   <img src=".github/assets/01-showcase.jpg" alt="HelloCubic Lite Showcase" width="1000" />
-   <a href="https://www.youtube.com/watch?v=ga3Aeqo_rWA" target="_blank" ><img src=".github/assets/01-showcase.gif" alt="HelloCubic Lite Showcase" width="1000" /></a>
+   <img src="../.github/assets/01-showcase.jpg" alt="HelloCubic Lite Showcase" width="1000" />
+   <a href="https://www.youtube.com/watch?v=ga3Aeqo_rWA" target="_blank" ><img src="../.github/assets/01-showcase.gif" alt="HelloCubic Lite Showcase" width="1000" /></a>
    <br>
     <em>open firmware showcase working on both hellocubic and smalltv</em>
 </div>
@@ -40,7 +43,7 @@
 
 **Warning: I am not responsible for bricking your devices. Flash at your own risk**
 
-**I recommend making a complete [backup](backup/readme.md) of your flash before doing anything**
+**I recommend making a complete [backup](../backup/readme.md) of your flash before doing anything**
 **I've upload my factory backup (version 7.0.17 for cube and 9.0.40 for small tv); it might be useful. Backup tested and approved, it works**
 
 ## Teardown
@@ -55,8 +58,8 @@
 - **Case**: 3d printed
 
 <div align="center">
-   <img src=".github/assets/02-disassembly-cube.jpg" alt="Cube Disassembly" width="1000" />
-   <img src=".github/assets/02-disassembly-tv.jpg" alt="Cube Disassembly" width="1000" />
+   <img src="../.github/assets/02-disassembly-cube.jpg" alt="Cube Disassembly" width="1000" />
+   <img src="../.github/assets/02-disassembly-tv.jpg" alt="Cube Disassembly" width="1000" />
    <br>
    <em>Cube & TV Disassembly</em>
 </div>
@@ -108,8 +111,8 @@ Many 1.3" ST7789 modules keep the backlight enabled when **BLK** is left floatin
 Be aware that **GPIO 0** and **GPIO 2** are ESP8266 boot strap pins. This wiring matches the original hardware used by the firmware, but if your module pulls either line to the wrong level during reset the ESP8266 may fail to boot.
 
 <div align="center">
-   <img src=".github/assets/03-pinout.jpg" alt="Pinout Diagram" width="1000" />
-   <img src=".github/assets/03-nodemcu.png" alt="NodeMCU working" width="500" />
+   <img src="../.github/assets/03-pinout.jpg" alt="Pinout Diagram" width="1000" />
+   <img src="../.github/assets/03-nodemcu.png" alt="NodeMCU working" width="500" />
    <br>
    <em>Pin Wiring Diagram (exact same for small tv) && NodeMCU working</em>
 </div>
@@ -287,7 +290,7 @@ Note: The Wi-Fi credentials and API token in config.json are migrated to EEPROM 
 Security of stored secrets:
 
 - All sensitive values (API keys, wifi credentials, tokens, etc.) are stored in EEPROM using a device-unique obfuscation scheme
-- The obfuscation key is derived from the ESP8266's MAC address, chip ID, and a salt (configurable [here](./src/main.cpp#L41) in code) using SHA-256
+- The obfuscation key is derived from the ESP8266's MAC address, chip ID, and a salt (configurable [here](../src/main.cpp#L41) in code) using SHA-256
 - The JSON payload is XORed with this derived key before being written to EEPROM, and de-obfuscated on read
 - This makes it much harder to recover secrets from a raw flash dump on another device, or with only partial knowledge of the hardware
 
@@ -403,7 +406,7 @@ If the device fails to boot successfully several times in a row (boot loop), it 
 
 ## License
 
-This project is licensed under the **GPLv3 License** - see the [LICENSE](LICENSE) file for details
+This project is licensed under the **GPLv3 License** - see the [LICENSE](../LICENSE) file for details
 
 ---
 

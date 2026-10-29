@@ -29,6 +29,7 @@
 #include "config/ConfigManager.h"
 #include "wireless/WiFiManager.h"
 #include "ntp/NTPClient.h"
+#include "web/ClaudeApi.h"
 
 extern ConfigManager configManager;
 extern WiFiManager* wifiManager;
@@ -173,6 +174,8 @@ void registerApiEndpoints(Webserver* webserver) {
     // responses=200:application/json,401:application/json
     webserver->raw().on("/api/v1/logs/clear", HTTP_POST, [webserver]() { handleLogsClear(webserver); });
 
+    registerClaudeEndpoints(webserver);
+
     webserver->raw().onNotFound([webserver]() {
         if (webserver->raw().method() == HTTP_OPTIONS) {
             setCorsHeaders(webserver);
@@ -227,7 +230,7 @@ static auto validateBearerToken(Webserver* webserver) -> bool {
  *
  * @return true if token is valid false otherwise
  */
-static auto requireBearerToken(Webserver* webserver) -> bool {
+auto requireBearerToken(Webserver* webserver) -> bool {
     if (validateBearerToken(webserver)) {
         return true;
     }

@@ -33,6 +33,8 @@
 #include "ntp/NTPClient.h"
 #include "boot/RescueMode.h"
 #include "dashboard/DashboardManager.h"
+#include "claude/ClaudeUsage.h"
+#include "claude/ClaudeScreen.h"
 #include <array>
 
 #ifndef METRICS_URL
@@ -185,6 +187,11 @@ void setup() {
         DashboardManager::begin(METRICS_ENDPOINT);
     }
 
+    ClaudeUsage::begin();
+    if (METRICS_ENDPOINT[0] == '\0' && WiFiManager::isConnected() && !wifiManager->isApMode()) {
+        ClaudeScreen::begin(wifiManager->getIP().toString());
+    }
+
     // enable watchdog before going to loop()
     // 2 seconds should be way more than the main loop needs to do stuff
     EspClass::wdtEnable(WDTO_2S);
@@ -216,6 +223,12 @@ void loop() {
         !wifiManager->isApMode()) {
         DashboardManager::update();
     }
+
+    if (wifiManager != nullptr && WiFiManager::isConnected() && !wifiManager->isApMode()) {
+        ClaudeUsage::loop();
+    }
+
+    ClaudeScreen::update();
 
     static unsigned long last_free_heap_log = 0;
     static constexpr unsigned long FREE_HEAP_LOG_INTERVAL_MS = 10000UL;
