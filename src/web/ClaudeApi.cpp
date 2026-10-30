@@ -97,6 +97,7 @@ void handleClaudeStatus(Webserver* webserver) {
     doc["has_refresh_token"] = ClaudeUsage::hasRefreshToken();
     doc["layout"] = ClaudeScreen::layout();
     doc["pace"] = ClaudeScreen::paceMarker();
+    doc["outline"] = ClaudeScreen::outline();
     putBrightness(doc);
     doc["uptime_s"] = millis() / 1000;
     doc["reset_reason"] = ESP.getResetReason();  // NOLINT(readability-static-accessed-through-instance)
@@ -170,14 +171,15 @@ void handleClaudeDisplay(Webserver* webserver) {
     parseBody(webserver, body);
     const JsonVariantConst layout = body["layout"];
     const JsonVariantConst pace = body["pace"];
+    const JsonVariantConst outline = body["outline"];
     const JsonVariantConst brightness = body["brightness"];
     const JsonVariantConst night = body["brightness_night"];
     const JsonVariantConst autoMode = body["brightness_auto"];
     const JsonVariantConst latitude = body["latitude"];
     const JsonVariantConst longitude = body["longitude"];
-    if (layout.isNull() && pace.isNull() && brightness.isNull() && night.isNull() && autoMode.isNull() &&
+    if (layout.isNull() && pace.isNull() && outline.isNull() && brightness.isNull() && night.isNull() && autoMode.isNull() &&
         latitude.isNull() && longitude.isNull()) {
-        sendError(webserver, HTTP_CODE_BAD_REQUEST, "Expected layout, pace, brightness and/or location");
+        sendError(webserver, HTTP_CODE_BAD_REQUEST, "Expected layout, pace, outline, brightness and/or location");
         return;
     }
     // Validate everything first so a bad request changes nothing
@@ -185,8 +187,9 @@ void handleClaudeDisplay(Webserver* webserver) {
     if (!layout.isNull() &&
         !(layout.is<int>() && layout.as<int>() >= 0 && layout.as<int>() < ClaudeScreen::LAYOUT_COUNT)) {
         invalid = "Unknown layout";
-    } else if ((!pace.isNull() && !pace.is<bool>()) || (!autoMode.isNull() && !autoMode.is<bool>())) {
-        invalid = "pace and brightness_auto must be booleans";
+    } else if ((!pace.isNull() && !pace.is<bool>()) || (!outline.isNull() && !outline.is<bool>()) ||
+               (!autoMode.isNull() && !autoMode.is<bool>())) {
+        invalid = "pace, outline and brightness_auto must be booleans";
     } else if (!validPercent(brightness) || !validPercent(night)) {
         invalid = "Brightness must be 0..100";
     } else if (!validDegrees(latitude, MAX_LATITUDE) || !validDegrees(longitude, MAX_LONGITUDE)) {
@@ -204,6 +207,10 @@ void handleClaudeDisplay(Webserver* webserver) {
     if (!pace.isNull()) {
         configManager.claude_pace = pace.as<bool>();
         ClaudeScreen::setPaceMarker(configManager.claude_pace);
+    }
+    if (!outline.isNull()) {
+        configManager.claude_outline = outline.as<bool>();
+        ClaudeScreen::setOutline(configManager.claude_outline);
     }
     if (!brightness.isNull()) {
         configManager.brightness = brightness.as<uint8_t>();
@@ -229,6 +236,7 @@ void handleClaudeDisplay(Webserver* webserver) {
     doc["status"] = "ok";
     doc["layout"] = ClaudeScreen::layout();
     doc["pace"] = ClaudeScreen::paceMarker();
+    doc["outline"] = ClaudeScreen::outline();
     putBrightness(doc);
     sendJson(webserver, HTTP_CODE_OK, doc);
 }
@@ -318,7 +326,7 @@ void registerClaudeEndpoints(Webserver* webserver) {
 
     // @openapi {post} /claude/display version=v1 group=Claude summary="Screen layout (0 rings, 1 bars), time
     // marker and brightness" requiresAuth=true requestBody=application/json
-    // requestBodySchema=layout:integer,pace:boolean,brightness:integer,brightness_night:integer,brightness_auto:boolean,latitude:number,longitude:number
+    // requestBodySchema=layout:integer,pace:boolean,outline:boolean,brightness:integer,brightness_night:integer,brightness_auto:boolean,latitude:number,longitude:number
     // example={"layout":1,"pace":true,"brightness":80,"brightness_night":15,"brightness_auto":true}
     // responses=200:application/json,400:application/json,401:application/json
     webserver->raw().on("/api/v1/claude/display", HTTP_POST, [webserver]() { handleClaudeDisplay(webserver); });

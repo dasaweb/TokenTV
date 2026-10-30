@@ -70,6 +70,7 @@ auto ConfigManager::load() -> bool {
     this->lcd_rotation = doc["lcd_rotation"] | lcd_rotation;
     this->claude_layout = doc["claude_layout"] | claude_layout;
     this->claude_pace = doc["claude_pace"] | claude_pace;
+    this->claude_outline = doc["claude_outline"] | claude_outline;
     this->brightness = doc["brightness"] | brightness;
     this->brightness_night = doc["brightness_night"] | brightness_night;
     this->brightness_auto = doc["brightness_auto"] | brightness_auto;
@@ -215,6 +216,7 @@ auto ConfigManager::save() -> bool {
     doc["lcd_rotation"] = lcd_rotation;
     doc["claude_layout"] = claude_layout;
     doc["claude_pace"] = claude_pace;
+    doc["claude_outline"] = claude_outline;
     doc["brightness"] = brightness;
     doc["brightness_night"] = brightness_night;
     doc["brightness_auto"] = brightness_auto;

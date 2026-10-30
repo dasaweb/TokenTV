@@ -63,6 +63,7 @@ class ConfigManager {
     uint8_t lcd_rotation = 4;
     uint8_t claude_layout = 0;
     bool claude_pace = true;
+    bool claude_outline = false;
     uint8_t brightness = 100;
     uint8_t brightness_night = 20;
     bool brightness_auto = false;

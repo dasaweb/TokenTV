@@ -10,11 +10,11 @@ rings or as bars with a pace marker.
 It is built on top of the [GeekMagic Open Firmware](https://github.com/Times-Z/GeekMagic-Open-Firmware) by
 Times-Z, so you keep its web UI, OTA updates, GIF player and rescue mode.
 
-| Rings with time marker | Bars with time marker |
-| :---: | :---: |
-| ![Ring layout with time marker](docs/images/rings-marker.jpg) | ![Bar layout with time marker, reserve and projection](docs/images/bars-marker.jpg) |
-| **Rings without time marker** | **Bars without time marker** |
-| ![Ring layout without time marker](docs/images/rings.jpg) | ![Bar layout without time marker](docs/images/bars.jpg) |
+| | With time marker | Without time marker |
+| --- | :---: | :---: |
+| **Rings** | ![Ring layout with time marker](docs/images/rings-marker.jpg) | ![Ring layout without time marker](docs/images/rings.jpg) |
+| **Bars** | ![Bar layout with time marker, reserve and projection](docs/images/bars-marker.jpg) | ![Bar layout without time marker](docs/images/bars.jpg) |
+| **Bars, outlined** | ![Outlined bar layout with time marker](docs/images/bars-outline-marker.jpg) | ![Outlined bar layout without time marker](docs/images/bars-outline.jpg) |
 
 ```
  ┌──────────────────────────────┐
@@ -55,7 +55,8 @@ projection whether the limit lasts until the reset:
   is not touched; the device gets its own token pair.
 - **Live usage:** polls every 5 minutes, honours `Retry-After`, backs off on errors.
 - **Two layouts:** ring gauges, or bars with reserve and a projection to the reset. Both are green / amber /
-  red (amber also when the server reports a warning severity). Switch on the `/claude` page.
+  red (amber also when the server reports a warning severity). Switch on the `/claude` page. The bar cards are
+  filled dark grey or, for more contrast, black with a grey frame.
 - **Time marker:** a white tick on rings and bars marks how much of the window has passed, so you see at a
   glance whether you are ahead of an even pace. Can be turned off on the `/claude` page.
 - **Brightness:** dimmable backlight, either fixed or following the sun: a day and a night level, blended
@@ -131,6 +132,7 @@ Until you log in, the display shows the login URL.
 | Warn / critical    | `WARN_PERCENT` / `CRIT_PERCENT` in `src/claude/ClaudeScreen.cpp` | 70 % / 90 %  |
 | Layout             | `/claude` page, stored as `claude_layout` in `config.json` (0 rings, 1 bars) | rings |
 | Time marker        | `/claude` page, stored as `claude_pace` in `config.json` | on |
+| Bar card style     | `/claude` page, stored as `claude_outline` in `config.json` (filled grey or black with grey frame) | filled |
 | Brightness         | `/claude` page, stored as `brightness` / `brightness_night` / `brightness_auto` in `config.json` (0 turns the backlight off) | 100 % / 20 % / off |
 | Location (sun)     | `/claude` page, stored as `latitude` / `longitude` in `config.json` | 51.16 / 10.45 (middle of Germany) |
 | Pace windows       | `SESSION_WINDOW_S` / `WEEKLY_WINDOW_S` in `src/claude/ClaudeScreen.cpp` | 5 h / 7 d |
@@ -143,7 +145,7 @@ All endpoints need `Authorization: Bearer <API_TOKEN>`, except the page itself.
 | ------ | ---------------------------- | ---------------------------------------------------------- |
 | GET    | `/claude`                    | Login and status page                                      |
 | GET    | `/api/v1/claude/status`      | State, usage, layout, time marker, brightness (incl. `brightness_now`, `sunrise`, `sunset`), token expiry, heap, last reset and crash record |
-| POST   | `/api/v1/claude/display`     | Screen settings, saved in `config.json`: `{"layout":0}` rings or `1` bars, `{"pace":false}` hides the time marker, `brightness` / `brightness_night` (0–100), `brightness_auto`, `latitude` / `longitude`; all fields optional |
+| POST   | `/api/v1/claude/display`     | Screen settings, saved in `config.json`: `{"layout":0}` rings or `1` bars, `{"pace":false}` hides the time marker, `{"outline":true}` draws the bar cards as black with a grey frame, `brightness` / `brightness_night` (0–100), `brightness_auto`, `latitude` / `longitude`; all fields optional |
 | POST   | `/api/v1/claude/login/start` | Starts a PKCE login, returns the authorize URL (`{"scope":...}` optional) |
 | POST   | `/api/v1/claude/login/finish`| Queues the pasted code; the exchange runs in the background (`login_error` in status) |
 | POST   | `/api/v1/claude/refresh`     | Fetch usage now                                            |
@@ -204,7 +206,7 @@ firmware:
 - *GFX Library for Arduino* is pinned to 1.6.4, and its YCbCr tables are moved to PROGMEM.
 - Secure storage frees its EEPROM buffer when idle.
 - `/` and `/index.html` are served from flash (`include/web/IndexPage.h`, a copy of `data/web/index.html`).
-- `config.json` has extra `claude_layout`, `claude_pace`, `brightness`, `brightness_night`, `brightness_auto`,
+- `config.json` has extra `claude_layout`, `claude_pace`, `claude_outline`, `brightness`, `brightness_night`, `brightness_auto`,
   `latitude` and `longitude` fields.
 - The backlight (GPIO 5) is driven by PWM (`src/display/Backlight.cpp`) instead of being switched on.
 

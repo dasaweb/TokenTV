@@ -23,6 +23,7 @@ constexpr uint16_t COLOR_MUTED = 0x94B2;
 constexpr uint16_t COLOR_TRACK = 0x2124;
 constexpr uint16_t COLOR_CARD = 0x18E3;
 constexpr uint16_t COLOR_BAR = 0x39E7;
+constexpr uint16_t COLOR_FRAME = 0x6B4D;
 constexpr uint16_t COLOR_CLAUDE = 0xDBAA;
 constexpr uint16_t COLOR_OK = 0x362B;
 constexpr uint16_t COLOR_WARN = 0xFD84;
@@ -39,6 +40,7 @@ bool active = false;
 bool gifWasPlaying = false;
 uint8_t currentLayout = ClaudeScreen::LAYOUT_RINGS;
 bool showPace = true;
+bool outlineCards = false;
 uint32_t drawnRevision = UINT32_MAX;
 time_t drawnMinute = 0;
 
@@ -263,7 +265,13 @@ void drawBarCard(size_t idx, const ClaudeLimit& limit, const char* label, long w
     const int16_t right = CARD_X + CARD_W - CARD_PAD;
     const int16_t barW = right - left;
     const int16_t barY = top + 36;
-    lcd->fillRoundRect(CARD_X, top, CARD_W, CARD_H, 6, COLOR_CARD);
+    if (outlineCards) {
+        // Black card with a grey frame for more contrast than the filled card
+        lcd->fillRoundRect(CARD_X, top, CARD_W, CARD_H, 6, COLOR_BG);
+        lcd->drawRoundRect(CARD_X, top, CARD_W, CARD_H, 6, COLOR_FRAME);
+    } else {
+        lcd->fillRoundRect(CARD_X, top, CARD_W, CARD_H, 6, COLOR_CARD);
+    }
     drawLeft(label, left, top + 20, u8g2_font_helvB10_tr, COLOR_MUTED);
     lcd->fillRect(left, barY, barW, BAR_H, COLOR_BAR);
 
@@ -427,6 +435,13 @@ void ClaudeScreen::setPaceMarker(bool enabled) {
 }
 
 auto ClaudeScreen::paceMarker() -> bool { return showPace; }
+
+void ClaudeScreen::setOutline(bool enabled) {
+    outlineCards = enabled;
+    invalidate();
+}
+
+auto ClaudeScreen::outline() -> bool { return outlineCards; }
 
 void ClaudeScreen::update() {
     if (!active) {

@@ -33,7 +33,7 @@ Windows path for `-F file=@C:\...`.
   devices with an old filesystem image get the Claude menu entry. Keep both in sync.
 - Screen layouts (`ClaudeScreen::LAYOUT_*`): rings or bars, each with an optional time (pace) marker; stored as
   `claude_layout` / `claude_pace` in `config.json`, set via `POST /api/v1/claude/display`. With the marker on,
-  the minute tick redraws the rings too.
+  the minute tick redraws the rings too. `claude_outline` draws the bar cards black with a grey frame.
 - `src/display/Backlight.cpp`: PWM backlight (GPIO 5, active low, squared curve). Auto mode blends day and night
   level by solar elevation (-6° to +6°) at `latitude`/`longitude`; re-evaluated every 30 s. Set via the same
   `POST /api/v1/claude/display`. Sun math needs `double` (float loses minutes in the sidereal angle).

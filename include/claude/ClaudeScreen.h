@@ -17,4 +17,7 @@ class ClaudeScreen {
     // Time marker on rings and bars, plus the reserve line on bars
     static void setPaceMarker(bool enabled);
     static auto paceMarker() -> bool;
+    // Bar layout: black cards with a grey frame instead of filled dark grey cards
+    static void setOutline(bool enabled);
+    static auto outline() -> bool;
 };

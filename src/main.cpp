@@ -193,6 +193,7 @@ void setup() {
     if (METRICS_ENDPOINT[0] == '\0' && WiFiManager::isConnected() && !wifiManager->isApMode()) {
         ClaudeScreen::setLayout(configManager.claude_layout);
         ClaudeScreen::setPaceMarker(configManager.claude_pace);
+        ClaudeScreen::setOutline(configManager.claude_outline);
         ClaudeScreen::begin(wifiManager->getIP().toString());
     }
 

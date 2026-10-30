@@ -22,7 +22,7 @@ static const char CLAUDE_PAGE_HTML[] PROGMEM = R"HTML(<!doctype html>
 function claudeHandler() {
   return {
     hasToken: !!localStorage.getItem("Authorization"), tokenRejected: false,
-    s: null, url: "", code: "", scope: "user:profile", msg: "", busy: false, timer: null, layout: 0, pace: true,
+    s: null, url: "", code: "", scope: "user:profile", msg: "", busy: false, timer: null, layout: 0, pace: true, outline: false,
     bl: { brightness: 100, brightness_night: 20, brightness_auto: false, latitude: 51.16, longitude: 10.45 },
     async init() {
       if (!this.hasToken) return;
@@ -38,12 +38,12 @@ function claudeHandler() {
       return j;
     },
     async load() {
-      try { this.s = await this.call("/api/v1/claude/status"); this.layout = this.s.layout || 0; this.pace = this.s.pace !== false;
+      try { this.s = await this.call("/api/v1/claude/status"); this.layout = this.s.layout || 0; this.pace = this.s.pace !== false; this.outline = !!this.s.outline;
         for (const k of Object.keys(this.bl)) if (this.s[k] !== undefined) this.bl[k] = this.s[k]; }
       catch (e) { this.msg = "Status: " + e.message; }
     },
     async saveDisplay() {
-      try { await this.call("/api/v1/claude/display", { layout: this.layout, pace: this.pace }); this.msg = "Anzeige gespeichert."; }
+      try { await this.call("/api/v1/claude/display", { layout: this.layout, pace: this.pace, outline: this.outline }); this.msg = "Anzeige gespeichert."; }
       catch (e) { this.msg = "Anzeige: " + e.message; }
     },
     async saveBrightness() {
@@ -131,6 +131,10 @@ function claudeHandler() {
       <label>
         <input type="checkbox" role="switch" x-model="pace" @change="saveDisplay()" />
         Zeit-Markierung anzeigen
+      </label>
+      <label x-show="layout === 1">
+        <input type="checkbox" role="switch" x-model="outline" @change="saveDisplay()" />
+        Balken-Karten nur umrandet (schwarzer Hintergrund, mehr Kontrast)
       </label>
       <small>Der weisse Strich zeigt, wie viel Zeit des Fensters (5 Stunden bzw. Woche) schon vergangen ist.
         Liegt der Verbrauch dahinter, bist du langsamer als gleichmaessig verteilt. Bei den Balken steht
