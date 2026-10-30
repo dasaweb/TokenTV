@@ -33,12 +33,12 @@ projection whether the limit lasts until the reset:
  │ ──────────────────────────── │
  │ 5 Stunden               31%  │
  │ ██████░░░░░░░│░░░░░░░░░░░░░  │
- │ 69% frei       Reset in 2h 14m│
- │ ● 24% Reserve  reicht bis Reset│
+ │ 69% frei     Reset in 2h 14m │
+ │ ● 24% Reservereicht bis Reset │
  │ Woche                   23%  │
  │ ████░░░│░░░░░░░░░░░░░░░░░░░  │
- │ 77% frei       Reset in 4d 12h│
- │ ● 9% Reserve   reicht bis Reset│
+ │ 77% frei     Reset in 4d 12h │
+ │ ● 9% Reservereicht bis Reset │
  │   aktualisiert vor 2 min     │
  └──────────────────────────────┘
 ```
