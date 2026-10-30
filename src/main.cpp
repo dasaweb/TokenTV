@@ -28,6 +28,7 @@
 #include "config/ConfigManager.h"
 #include "wireless/WiFiManager.h"
 #include "display/DisplayManager.h"
+#include "display/Backlight.h"
 #include "web/Webserver.h"
 #include "web/Api.h"
 #include "ntp/NTPClient.h"
@@ -139,6 +140,7 @@ void setup() {
     step += 2;
 
     DisplayManager::begin();
+    Backlight::begin();
 
     DisplayManager::drawLoadingBar((float)step / TOTAL_STEPS, LOADING_BAR_Y);
 
@@ -220,6 +222,7 @@ void loop() {
     }
 
     DisplayManager::update();
+    Backlight::loop();
 
     if (METRICS_ENDPOINT[0] != '\0' && wifiManager != nullptr && WiFiManager::isConnected() &&
         !wifiManager->isApMode()) {

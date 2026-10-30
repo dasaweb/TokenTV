@@ -23,6 +23,7 @@ function claudeHandler() {
   return {
     hasToken: !!localStorage.getItem("Authorization"), tokenRejected: false,
     s: null, url: "", code: "", scope: "user:profile", msg: "", busy: false, timer: null, layout: 0, pace: true,
+    bl: { brightness: 100, brightness_night: 20, brightness_auto: false, latitude: 51.16, longitude: 10.45 },
     async init() {
       if (!this.hasToken) return;
       await this.load();
@@ -37,12 +38,17 @@ function claudeHandler() {
       return j;
     },
     async load() {
-      try { this.s = await this.call("/api/v1/claude/status"); this.layout = this.s.layout || 0; this.pace = this.s.pace !== false; }
+      try { this.s = await this.call("/api/v1/claude/status"); this.layout = this.s.layout || 0; this.pace = this.s.pace !== false;
+        for (const k of Object.keys(this.bl)) if (this.s[k] !== undefined) this.bl[k] = this.s[k]; }
       catch (e) { this.msg = "Status: " + e.message; }
     },
     async saveDisplay() {
       try { await this.call("/api/v1/claude/display", { layout: this.layout, pace: this.pace }); this.msg = "Anzeige gespeichert."; }
       catch (e) { this.msg = "Anzeige: " + e.message; }
+    },
+    async saveBrightness() {
+      try { Object.assign(this.s, await this.call("/api/v1/claude/display", this.bl)); this.msg = "Helligkeit gespeichert."; }
+      catch (e) { this.msg = "Helligkeit: " + e.message; }
     },
     async start() {
       this.busy = true; this.msg = "";
@@ -78,6 +84,7 @@ function claudeHandler() {
       catch (e) { this.msg = e.message; }
     },
     pct(l) { return l && l.valid ? Math.round(l.percent) + " %" : "-"; },
+    clock(ts) { return ts ? new Date(ts * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "-"; },
     when(ts) { return ts ? new Date(ts * 1000).toLocaleString() : "-"; },
     get needsLogin() { return this.s && (!this.s.logged_in || this.s.state === "relogin_needed"); },
   };
@@ -128,6 +135,32 @@ function claudeHandler() {
       <small>Der weisse Strich zeigt, wie viel Zeit des Fensters (5 Stunden bzw. Woche) schon vergangen ist.
         Liegt der Verbrauch dahinter, bist du langsamer als gleichmaessig verteilt. Bei den Balken steht
         zusaetzlich die Reserve darunter.</small>
+    </article>
+  </template>
+
+  <template x-if="s">
+    <article>
+      <label for="bl-day"><strong x-text="bl.brightness_auto ? 'Helligkeit tagsueber' : 'Helligkeit'"></strong>
+        <span x-text="bl.brightness + ' %'"></span></label>
+      <input id="bl-day" type="range" min="0" max="100" step="5" x-model.number="bl.brightness" @change="saveBrightness()" />
+      <label>
+        <input type="checkbox" role="switch" x-model="bl.brightness_auto" @change="saveBrightness()" />
+        Nachts abdunkeln (nach Sonnenauf- und -untergang)
+      </label>
+      <div x-show="bl.brightness_auto">
+        <label for="bl-night">Helligkeit nachts <span x-text="bl.brightness_night + ' %'"></span></label>
+        <input id="bl-night" type="range" min="0" max="100" step="5" x-model.number="bl.brightness_night" @change="saveBrightness()" />
+        <div class="grid">
+          <label>Breitengrad <input type="number" step="0.01" min="-90" max="90" x-model.number="bl.latitude" @change="saveBrightness()" /></label>
+          <label>Laengengrad <input type="number" step="0.01" min="-180" max="180" x-model.number="bl.longitude" @change="saveBrightness()" /></label>
+        </div>
+        <small>Sonnenaufgang <span x-text="clock(s.sunrise)"></span>, Sonnenuntergang <span x-text="clock(s.sunset)"></span>,
+          aktuell <span x-text="s.brightness_now + ' %'"></span>. In der Daemmerung (Sonne zwischen 6&deg; unter und
+          6&deg; ueber dem Horizont) wird stufenlos uebergeblendet. Koordinaten z. B. aus einer Karten-App,
+          Osten und Norden positiv.</small>
+      </div>
+      <small x-show="bl.brightness === 0 || (bl.brightness_auto && bl.brightness_night === 0)">0 % schaltet die
+        Hintergrundbeleuchtung ganz aus.</small>
     </article>
   </template>
 

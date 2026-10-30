@@ -52,12 +52,15 @@ projection whether the limit lasts until the reset:
   red (amber also when the server reports a warning severity). Switch on the `/claude` page.
 - **Time marker:** a white tick on rings and bars marks how much of the window has passed, so you see at a
   glance whether you are ahead of an even pace. Can be turned off on the `/claude` page.
+- **Brightness:** dimmable backlight, either fixed or following the sun: a day and a night level, blended
+  through twilight (sun from 6° below to 6° above the horizon) for the configured location. Set on the
+  `/claude` page.
 - **Reset times:** countdown for the session window, weekday and time for the weekly reset (local time zone).
   The API reports e.g. `10:59:59.95`; times are rounded to the minute and snapped to a quarter hour when within
   two minutes, so this shows as 11:00.
 - **Proper TLS:** certificates are validated against pinned root CAs (GTS Root R4, ISRG Root X1/X2).
 - **Fits into 80 KB of RAM:** see [Memory notes](#memory-notes) for what it took.
-- **Web page** at `http://<device>/claude` for login, status, layout, manual refresh and logout. It is served
+- **Web page** at `http://<device>/claude` for login, status, layout, brightness, manual refresh and logout. It is served
   from flash, so no filesystem update is needed. The home page is served from flash too, so the menu has a
   *Claude Usage* entry even with the upstream filesystem image.
 
@@ -122,6 +125,8 @@ Until you log in, the display shows the login URL.
 | Warn / critical    | `WARN_PERCENT` / `CRIT_PERCENT` in `src/claude/ClaudeScreen.cpp` | 70 % / 90 %  |
 | Layout             | `/claude` page, stored as `claude_layout` in `config.json` (0 rings, 1 bars) | rings |
 | Time marker        | `/claude` page, stored as `claude_pace` in `config.json` | on |
+| Brightness         | `/claude` page, stored as `brightness` / `brightness_night` / `brightness_auto` in `config.json` (0 turns the backlight off) | 100 % / 20 % / off |
+| Location (sun)     | `/claude` page, stored as `latitude` / `longitude` in `config.json` | 51.16 / 10.45 (middle of Germany) |
 | Pace windows       | `SESSION_WINDOW_S` / `WEEKLY_WINDOW_S` in `src/claude/ClaudeScreen.cpp` | 5 h / 7 d |
 
 ## API
@@ -131,8 +136,8 @@ All endpoints need `Authorization: Bearer <API_TOKEN>`, except the page itself.
 | Method | Path                         | Purpose                                                    |
 | ------ | ---------------------------- | ---------------------------------------------------------- |
 | GET    | `/claude`                    | Login and status page                                      |
-| GET    | `/api/v1/claude/status`      | State, usage, layout, time marker, token expiry, heap, last reset and crash record |
-| POST   | `/api/v1/claude/display`     | Screen settings, saved in `config.json`: `{"layout":0}` rings or `1` bars, `{"pace":false}` hides the time marker; both fields optional |
+| GET    | `/api/v1/claude/status`      | State, usage, layout, time marker, brightness (incl. `brightness_now`, `sunrise`, `sunset`), token expiry, heap, last reset and crash record |
+| POST   | `/api/v1/claude/display`     | Screen settings, saved in `config.json`: `{"layout":0}` rings or `1` bars, `{"pace":false}` hides the time marker, `brightness` / `brightness_night` (0–100), `brightness_auto`, `latitude` / `longitude`; all fields optional |
 | POST   | `/api/v1/claude/login/start` | Starts a PKCE login, returns the authorize URL (`{"scope":...}` optional) |
 | POST   | `/api/v1/claude/login/finish`| Queues the pasted code; the exchange runs in the background (`login_error` in status) |
 | POST   | `/api/v1/claude/refresh`     | Fetch usage now                                            |
@@ -193,7 +198,9 @@ firmware:
 - *GFX Library for Arduino* is pinned to 1.6.4, and its YCbCr tables are moved to PROGMEM.
 - Secure storage frees its EEPROM buffer when idle.
 - `/` and `/index.html` are served from flash (`include/web/IndexPage.h`, a copy of `data/web/index.html`).
-- `config.json` has extra `claude_layout` and `claude_pace` fields.
+- `config.json` has extra `claude_layout`, `claude_pace`, `brightness`, `brightness_night`, `brightness_auto`,
+  `latitude` and `longitude` fields.
+- The backlight (GPIO 5) is driven by PWM (`src/display/Backlight.cpp`) instead of being switched on.
 
 ## Disclaimer
 
