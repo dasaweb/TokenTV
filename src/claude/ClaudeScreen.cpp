@@ -48,6 +48,18 @@ constexpr int16_t FOOTER_Y = 228;
 
 auto gfx() -> Arduino_GFX* { return DisplayManager::getGfx(); }
 
+// The boot screen leaves text size 2 behind, which doubles every U8g2 font, and wrapping would push an
+// overflowing clock onto the next line
+void beginText() {
+    gfx()->setTextSize(1);
+    gfx()->setTextWrap(false);
+}
+
+void endText() {
+    gfx()->setFont(static_cast<const GFXfont*>(nullptr));  // leave the default font for other screens
+    gfx()->setTextWrap(true);
+}
+
 auto localTime(time_t when) -> struct tm {
     setTZ(CLAUDE_TZ);  // configTime(0, 0, ...) in the NTP client resets TZ on every sync
     struct tm out {};
@@ -201,6 +213,7 @@ void drawMessage(const char* title, const char* line1, const char* line2) {
 
 void drawFull() {
     auto* lcd = gfx();
+    beginText();
     lcd->fillScreen(COLOR_BG);
     drawHeader();
 
@@ -224,17 +237,18 @@ void drawFull() {
         drawResetLine();
         drawFooter();
     }
-    lcd->setFont(static_cast<const GFXfont*>(nullptr));  // leave the default font for other screens
+    endText();
 }
 
 void drawMinuteTick() {
+    beginText();
     drawHeader();
     if (ClaudeUsage::data().fetchedAt > 0 && ClaudeUsage::state() != ClaudeState::LoggedOut &&
         ClaudeUsage::state() != ClaudeState::ReloginNeeded) {
         drawResetLine();
         drawFooter();
     }
-    gfx()->setFont(static_cast<const GFXfont*>(nullptr));
+    endText();
 }
 // NOLINTEND(readability-magic-numbers,bugprone-narrowing-conversions)
 }  // namespace
