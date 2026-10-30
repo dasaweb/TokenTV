@@ -9,6 +9,7 @@
 #include <WiFiClientSecureBearSSL.h>
 #include <lwip/dns.h>
 #include <algorithm>
+#include <cstdlib>
 #include <array>
 #include <memory>
 #include <sys/time.h>
@@ -434,10 +435,24 @@ auto refreshTokens() -> TokenOutcome {
     return postToken(json);
 }
 
+// Resets come as e.g. 10:59:59.95. Round to the minute and snap to a quarter hour within two minutes, so the
+// screen shows 11:00 instead of 10:59.
+auto roundResetTime(time_t when) -> time_t {
+    constexpr time_t MINUTE_S = 60;
+    constexpr time_t QUARTER_S = 15 * MINUTE_S;
+    constexpr time_t SNAP_S = 2 * MINUTE_S;
+    if (when <= 0) {
+        return when;
+    }
+    const time_t minute = (when + (MINUTE_S / 2)) / MINUTE_S * MINUTE_S;
+    const time_t quarter = (minute + (QUARTER_S / 2)) / QUARTER_S * QUARTER_S;
+    return std::abs(static_cast<long>(quarter - minute)) <= SNAP_S ? quarter : minute;
+}
+
 void applyLimit(ClaudeLimit& target, float percent, const char* resetsAt, bool warning) {
     target.valid = true;
     target.percent = percent;
-    target.resetsAt = parseIso8601(resetsAt);
+    target.resetsAt = roundResetTime(parseIso8601(resetsAt));
     target.warning = warning;
 }
 
