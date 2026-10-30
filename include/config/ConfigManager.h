@@ -62,6 +62,7 @@ class ConfigManager {
     SecureStorage secure;
     uint8_t lcd_rotation = 4;
     uint8_t claude_layout = 0;
+    bool claude_pace = true;
     std::string ntp_server;
 
     const char* getNtpServer() const { return ntp_server.c_str(); }

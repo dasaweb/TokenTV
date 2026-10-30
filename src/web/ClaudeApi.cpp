@@ -70,6 +70,7 @@ void handleClaudeStatus(Webserver* webserver) {
     doc["max_free_block"] = ESP.getMaxFreeBlockSize();  // NOLINT(readability-static-accessed-through-instance)
     doc["has_refresh_token"] = ClaudeUsage::hasRefreshToken();
     doc["layout"] = ClaudeScreen::layout();
+    doc["pace"] = ClaudeScreen::paceMarker();
     doc["uptime_s"] = millis() / 1000;
     doc["reset_reason"] = ESP.getResetReason();  // NOLINT(readability-static-accessed-through-instance)
     doc["reset_info"] = ESP.getResetInfo();      // NOLINT(readability-static-accessed-through-instance)
@@ -132,29 +133,39 @@ void handleClaudeRefresh(Webserver* webserver) {
     doc["message"] = "Fetch scheduled";
     sendJson(webserver, HTTP_CODE_OK, doc);
 }
-void handleClaudeLayout(Webserver* webserver) {
+void handleClaudeDisplay(Webserver* webserver) {
     if (!requireBearerToken(webserver)) {
         return;
     }
     JsonDocument body;
-    if (!parseBody(webserver, body) || !body["layout"].is<int>()) {
-        sendError(webserver, HTTP_CODE_BAD_REQUEST, "Missing layout");
+    const bool parsed = parseBody(webserver, body);
+    const bool hasLayout = parsed && body["layout"].is<int>();
+    const bool hasPace = parsed && body["pace"].is<bool>();
+    if (!hasLayout && !hasPace) {
+        sendError(webserver, HTTP_CODE_BAD_REQUEST, "Expected layout and/or pace");
         return;
     }
-    const int layout = body["layout"].as<int>();
-    if (layout < 0 || layout >= ClaudeScreen::LAYOUT_COUNT) {
-        sendError(webserver, HTTP_CODE_BAD_REQUEST, "Unknown layout");
-        return;
+    if (hasLayout) {
+        const int layout = body["layout"].as<int>();
+        if (layout < 0 || layout >= ClaudeScreen::LAYOUT_COUNT) {
+            sendError(webserver, HTTP_CODE_BAD_REQUEST, "Unknown layout");
+            return;
+        }
+        configManager.claude_layout = static_cast<uint8_t>(layout);
+        ClaudeScreen::setLayout(configManager.claude_layout);
     }
-    configManager.claude_layout = static_cast<uint8_t>(layout);
-    ClaudeScreen::setLayout(configManager.claude_layout);
+    if (hasPace) {
+        configManager.claude_pace = body["pace"].as<bool>();
+        ClaudeScreen::setPaceMarker(configManager.claude_pace);
+    }
     if (!configManager.save()) {
         sendError(webserver, HTTP_CODE_INTERNAL_ERROR, "Failed to save config");
         return;
     }
     JsonDocument doc;
     doc["status"] = "ok";
-    doc["layout"] = layout;
+    doc["layout"] = ClaudeScreen::layout();
+    doc["pace"] = ClaudeScreen::paceMarker();
     sendJson(webserver, HTTP_CODE_OK, doc);
 }
 
@@ -241,10 +252,11 @@ void registerClaudeEndpoints(Webserver* webserver) {
     // responses=200:application/json,401:application/json
     webserver->raw().on("/api/v1/claude/diag", HTTP_GET, [webserver]() { handleClaudeDiag(webserver); });
 
-    // @openapi {post} /claude/layout version=v1 group=Claude summary="Select the screen layout (0 rings, 1 bars)"
-    // requiresAuth=true requestBody=application/json requestBodySchema=layout:integer example={"layout":1}
+    // @openapi {post} /claude/display version=v1 group=Claude summary="Screen layout (0 rings, 1 bars) and time
+    // marker" requiresAuth=true requestBody=application/json requestBodySchema=layout:integer,pace:boolean
+    // example={"layout":1,"pace":true}
     // responses=200:application/json,400:application/json,401:application/json
-    webserver->raw().on("/api/v1/claude/layout", HTTP_POST, [webserver]() { handleClaudeLayout(webserver); });
+    webserver->raw().on("/api/v1/claude/display", HTTP_POST, [webserver]() { handleClaudeDisplay(webserver); });
 
     // @openapi {post} /claude/refresh version=v1 group=Claude summary="Fetch usage now" requiresAuth=true
     // responses=200:application/json,401:application/json

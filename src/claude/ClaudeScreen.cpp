@@ -38,6 +38,7 @@ String ip;
 bool active = false;
 bool gifWasPlaying = false;
 uint8_t currentLayout = ClaudeScreen::LAYOUT_RINGS;
+bool showPace = true;
 uint32_t drawnRevision = UINT32_MAX;
 time_t drawnMinute = 0;
 
@@ -47,6 +48,7 @@ constexpr int16_t HEADER_H = 26;
 constexpr int16_t RING_Y = 94;
 constexpr int16_t RING_OUTER = 46;
 constexpr int16_t RING_INNER = 40;
+constexpr int16_t PACE_OVERHANG = 3;
 constexpr std::array<int16_t, 2> RING_X = {62, 178};
 constexpr int16_t LABEL_Y = 158;
 constexpr int16_t RESET_Y = 177;
@@ -181,10 +183,10 @@ void drawHeader() {
     lcd->drawFastHLine(10, HEADER_H, 220, COLOR_TRACK);
 }
 
-void drawRing(size_t idx, const ClaudeLimit& limit, const char* label) {
+void drawRing(size_t idx, const ClaudeLimit& limit, const char* label, long windowS) {
     auto* lcd = gfx();
     const int16_t centerX = RING_X[idx];
-    lcd->fillCircle(centerX, RING_Y, RING_OUTER, COLOR_BG);
+    lcd->fillCircle(centerX, RING_Y, RING_OUTER + PACE_OVERHANG, COLOR_BG);
     lcd->fillArc(centerX, RING_Y, RING_OUTER, RING_INNER, 0, 360, COLOR_TRACK);
 
     std::array<char, TEXT_BUF> text{};
@@ -197,8 +199,22 @@ void drawRing(size_t idx, const ClaudeLimit& limit, const char* label) {
     } else {
         snprintf(text.data(), text.size(), "--");
     }
+
+    // Pace marker: a radial tick at the share of the window that has passed
+    const float elapsed = elapsedFraction(limit, windowS);
+    if (showPace && elapsed >= 0.0F) {
+        const float angle = 270.0F + (elapsed * 360.0F);
+        lcd->fillArc(centerX, RING_Y, RING_OUTER + PACE_OVERHANG, RING_INNER - PACE_OVERHANG, angle - 2.5F,
+                     angle + 2.5F, COLOR_TEXT);
+    }
     drawCentered(text.data(), centerX, RING_Y + 7, u8g2_font_fur17_tr, COLOR_TEXT);
     drawCentered(label, centerX, LABEL_Y, u8g2_font_helvR08_tr, COLOR_MUTED);
+}
+
+void drawRings() {
+    const ClaudeUsageData& usage = ClaudeUsage::data();
+    drawRing(0, usage.session, "5 Stunden", SESSION_WINDOW_S);
+    drawRing(1, usage.weekly, "Woche", WEEKLY_WINDOW_S);
 }
 
 void drawResetLine() {
@@ -268,7 +284,7 @@ void drawBarCard(size_t idx, const ClaudeLimit& limit, const char* label, long w
 
     // Pace marker: where usage would be if spread evenly over the window
     const float elapsed = elapsedFraction(limit, windowS);
-    if (elapsed >= 0.0F) {
+    if (showPace && elapsed >= 0.0F) {
         const auto markX = static_cast<int16_t>(left + static_cast<int16_t>(static_cast<float>(barW) * elapsed) - 1);
         lcd->fillRect(std::min<int16_t>(std::max(markX, left), right - 3), barY - 3, 3, BAR_H + 6, COLOR_TEXT);
     }
@@ -283,12 +299,14 @@ void drawBarCard(size_t idx, const ClaudeLimit& limit, const char* label, long w
     if (elapsed < 0.0F) {
         return;
     }
-    const float reserve = (elapsed * 100.0F) - used;
-    const uint16_t paceColor = reserve >= 0.0F ? COLOR_OK : COLOR_WARN;
-    lcd->fillCircle(left + 3, top + 79, 3, paceColor);
-    snprintf(text.data(), text.size(), reserve >= 0.0F ? "%d%% Reserve" : "%d%% zu schnell",
-             static_cast<int>(std::fabs(reserve) + 0.5F));
-    drawLeft(text.data(), left + 10, top + 83, u8g2_font_helvR08_tr, paceColor);
+    if (showPace) {
+        const float reserve = (elapsed * 100.0F) - used;
+        const uint16_t paceColor = reserve >= 0.0F ? COLOR_OK : COLOR_WARN;
+        lcd->fillCircle(left + 3, top + 79, 3, paceColor);
+        snprintf(text.data(), text.size(), reserve >= 0.0F ? "%d%% Reserve" : "%d%% zu schnell",
+                 static_cast<int>(std::fabs(reserve) + 0.5F));
+        drawLeft(text.data(), left + 10, top + 83, u8g2_font_helvR08_tr, paceColor);
+    }
 
     uint16_t projColor = COLOR_OK;
     formatProjection(limit, elapsed, windowS, text.data(), text.size(), projColor);
@@ -361,8 +379,7 @@ void drawFull() {
         drawBarCards();
         drawFooter();
     } else {
-        drawRing(0, usage.session, "5 Stunden");
-        drawRing(1, usage.weekly, "Woche");
+        drawRings();
         drawResetLine();
         drawFooter();
     }
@@ -377,6 +394,9 @@ void drawMinuteTick() {
         if (currentLayout == ClaudeScreen::LAYOUT_BARS) {
             drawBarCards();  // the pace marker and projection move with time
         } else {
+            if (showPace) {
+                drawRings();
+            }
             drawResetLine();
         }
         drawFooter();
@@ -400,6 +420,13 @@ void ClaudeScreen::setLayout(uint8_t newLayout) {
 }
 
 auto ClaudeScreen::layout() -> uint8_t { return currentLayout; }
+
+void ClaudeScreen::setPaceMarker(bool enabled) {
+    showPace = enabled;
+    invalidate();
+}
+
+auto ClaudeScreen::paceMarker() -> bool { return showPace; }
 
 void ClaudeScreen::update() {
     if (!active) {

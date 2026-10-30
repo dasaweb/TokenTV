@@ -69,6 +69,7 @@ auto ConfigManager::load() -> bool {
 
     this->lcd_rotation = doc["lcd_rotation"] | lcd_rotation;
     this->claude_layout = doc["claude_layout"] | claude_layout;
+    this->claude_pace = doc["claude_pace"] | claude_pace;
 
     String nvs_ssid = secure.get("wifi_ssid", "");
     String nvs_password = secure.get("wifi_password", "");
@@ -208,6 +209,7 @@ auto ConfigManager::save() -> bool {
 
     doc["lcd_rotation"] = lcd_rotation;
     doc["claude_layout"] = claude_layout;
+    doc["claude_pace"] = claude_pace;
     if (!this->ntp_server.empty()) {
         doc["ntp_server"] = this->ntp_server.c_str();
     }

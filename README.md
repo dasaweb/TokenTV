@@ -48,8 +48,10 @@ projection whether the limit lasts until the reset:
 - **Standalone:** on-device OAuth login (PKCE) with automatic token refresh. Your Claude Code session on the PC
   is not touched; the device gets its own token pair.
 - **Live usage:** polls every 5 minutes, honours `Retry-After`, backs off on errors.
-- **Two layouts:** ring gauges, or bars with a pace marker, reserve and a projection to the reset. Both are
-  green / amber / red (amber also when the server reports a warning severity). Switch on the `/claude` page.
+- **Two layouts:** ring gauges, or bars with reserve and a projection to the reset. Both are green / amber /
+  red (amber also when the server reports a warning severity). Switch on the `/claude` page.
+- **Time marker:** a white tick on rings and bars marks how much of the window has passed, so you see at a
+  glance whether you are ahead of an even pace. Can be turned off on the `/claude` page.
 - **Reset times:** countdown for the session window, weekday and time for the weekly reset (local time zone).
   The API reports e.g. `10:59:59.95`; times are rounded to the minute and snapped to a quarter hour when within
   two minutes, so this shows as 11:00.
@@ -119,6 +121,7 @@ Until you log in, the display shows the login URL.
 | OAuth scope        | *Erweitert* on the login page                  | `user:profile` (enough for usage) |
 | Warn / critical    | `WARN_PERCENT` / `CRIT_PERCENT` in `src/claude/ClaudeScreen.cpp` | 70 % / 90 %  |
 | Layout             | `/claude` page, stored as `claude_layout` in `config.json` (0 rings, 1 bars) | rings |
+| Time marker        | `/claude` page, stored as `claude_pace` in `config.json` | on |
 | Pace windows       | `SESSION_WINDOW_S` / `WEEKLY_WINDOW_S` in `src/claude/ClaudeScreen.cpp` | 5 h / 7 d |
 
 ## API
@@ -128,8 +131,8 @@ All endpoints need `Authorization: Bearer <API_TOKEN>`, except the page itself.
 | Method | Path                         | Purpose                                                    |
 | ------ | ---------------------------- | ---------------------------------------------------------- |
 | GET    | `/claude`                    | Login and status page                                      |
-| GET    | `/api/v1/claude/status`      | State, usage, layout, token expiry, heap, last reset and crash record |
-| POST   | `/api/v1/claude/layout`      | Select the screen layout (`{"layout":0}` rings, `1` bars), saved in `config.json` |
+| GET    | `/api/v1/claude/status`      | State, usage, layout, time marker, token expiry, heap, last reset and crash record |
+| POST   | `/api/v1/claude/display`     | Screen settings, saved in `config.json`: `{"layout":0}` rings or `1` bars, `{"pace":false}` hides the time marker; both fields optional |
 | POST   | `/api/v1/claude/login/start` | Starts a PKCE login, returns the authorize URL (`{"scope":...}` optional) |
 | POST   | `/api/v1/claude/login/finish`| Queues the pasted code; the exchange runs in the background (`login_error` in status) |
 | POST   | `/api/v1/claude/refresh`     | Fetch usage now                                            |
@@ -190,7 +193,7 @@ firmware:
 - *GFX Library for Arduino* is pinned to 1.6.4, and its YCbCr tables are moved to PROGMEM.
 - Secure storage frees its EEPROM buffer when idle.
 - `/` and `/index.html` are served from flash (`include/web/IndexPage.h`, a copy of `data/web/index.html`).
-- `config.json` has an extra `claude_layout` field.
+- `config.json` has extra `claude_layout` and `claude_pace` fields.
 
 ## Disclaimer
 

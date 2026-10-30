@@ -22,7 +22,7 @@ static const char CLAUDE_PAGE_HTML[] PROGMEM = R"HTML(<!doctype html>
 function claudeHandler() {
   return {
     hasToken: !!localStorage.getItem("Authorization"), tokenRejected: false,
-    s: null, url: "", code: "", scope: "user:profile", msg: "", busy: false, timer: null, layout: 0,
+    s: null, url: "", code: "", scope: "user:profile", msg: "", busy: false, timer: null, layout: 0, pace: true,
     async init() {
       if (!this.hasToken) return;
       await this.load();
@@ -37,12 +37,12 @@ function claudeHandler() {
       return j;
     },
     async load() {
-      try { this.s = await this.call("/api/v1/claude/status"); this.layout = this.s.layout || 0; }
+      try { this.s = await this.call("/api/v1/claude/status"); this.layout = this.s.layout || 0; this.pace = this.s.pace !== false; }
       catch (e) { this.msg = "Status: " + e.message; }
     },
-    async saveLayout() {
-      try { await this.call("/api/v1/claude/layout", { layout: this.layout }); this.msg = "Layout gespeichert."; }
-      catch (e) { this.msg = "Layout: " + e.message; }
+    async saveDisplay() {
+      try { await this.call("/api/v1/claude/display", { layout: this.layout, pace: this.pace }); this.msg = "Anzeige gespeichert."; }
+      catch (e) { this.msg = "Anzeige: " + e.message; }
     },
     async start() {
       this.busy = true; this.msg = "";
@@ -117,12 +117,17 @@ function claudeHandler() {
   <template x-if="s">
     <article>
       <label for="claude-layout"><strong>Layout auf dem Display</strong></label>
-      <select id="claude-layout" x-model.number="layout" @change="saveLayout()">
+      <select id="claude-layout" x-model.number="layout" @change="saveDisplay()">
         <option value="0">Ringe</option>
-        <option value="1">Balken mit Tempo-Markierung</option>
+        <option value="1">Balken</option>
       </select>
-      <small>Bei den Balken zeigt der weisse Strich, wie viel Zeit des Fensters schon vergangen ist.
-        Liegt der Balken links davon, bist du langsamer als gleichmaessig verteilt (Reserve).</small>
+      <label>
+        <input type="checkbox" role="switch" x-model="pace" @change="saveDisplay()" />
+        Zeit-Markierung anzeigen
+      </label>
+      <small>Der weisse Strich zeigt, wie viel Zeit des Fensters (5 Stunden bzw. Woche) schon vergangen ist.
+        Liegt der Verbrauch dahinter, bist du langsamer als gleichmaessig verteilt. Bei den Balken steht
+        zusaetzlich die Reserve darunter.</small>
     </article>
   </template>
 

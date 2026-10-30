@@ -14,4 +14,7 @@ class ClaudeScreen {
     static void invalidate();
     static void setLayout(uint8_t newLayout);
     static auto layout() -> uint8_t;
+    // Time marker on rings and bars, plus the reserve line on bars
+    static void setPaceMarker(bool enabled);
+    static auto paceMarker() -> bool;
 };

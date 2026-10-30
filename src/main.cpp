@@ -190,6 +190,7 @@ void setup() {
     ClaudeUsage::begin();
     if (METRICS_ENDPOINT[0] == '\0' && WiFiManager::isConnected() && !wifiManager->isApMode()) {
         ClaudeScreen::setLayout(configManager.claude_layout);
+        ClaudeScreen::setPaceMarker(configManager.claude_pace);
         ClaudeScreen::begin(wifiManager->getIP().toString());
     }
 
