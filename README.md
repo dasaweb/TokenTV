@@ -10,6 +10,12 @@ rings or as bars with a pace marker.
 It is built on top of the [GeekMagic Open Firmware](https://github.com/Times-Z/GeekMagic-Open-Firmware) by
 Times-Z, so you keep its web UI, OTA updates, GIF player and rescue mode.
 
+| Rings with time marker | Bars with time marker |
+| :---: | :---: |
+| ![Ring layout with time marker](docs/images/rings-marker.jpg) | ![Bar layout with time marker, reserve and projection](docs/images/bars-marker.jpg) |
+| **Rings without time marker** | **Bars without time marker** |
+| ![Ring layout without time marker](docs/images/rings.jpg) | ![Bar layout without time marker](docs/images/bars.jpg) |
+
 ```
  ┌──────────────────────────────┐
  │ ● Claude               22:47 │
