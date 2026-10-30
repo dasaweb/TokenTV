@@ -29,7 +29,10 @@ Windows path for `-F file=@C:\...`.
 - `src/claude/CrashLog.cpp`: `custom_crash_callback` writes reason and stack code addresses to RTC memory
   (block 32; RescueMode uses block 0).
 - `src/web/ClaudeApi.cpp`: `/claude` page (`include/web/ClaudePage.h`, PROGMEM, Alpine.js) and
-  `/api/v1/claude/*`.
+  `/api/v1/claude/*`. It also serves `/` from `include/web/IndexPage.h`, a copy of `data/web/index.html`, so
+  devices with an old filesystem image get the Claude menu entry. Keep both in sync.
+- Screen layouts (`ClaudeScreen::LAYOUT_*`): rings or bars with a pace marker; stored as `claude_layout` in
+  `config.json`.
 - `include/claude/ClaudeCerts.h`: root CAs per host. Regenerate when the chains change
   (`openssl s_client -showcerts`).
 - `scripts/patch_gfx_progmem.py`: pre-build patch that moves Arduino_GFX YCbCr tables to flash.

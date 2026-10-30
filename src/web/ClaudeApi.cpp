@@ -5,10 +5,15 @@
 #include <ESP8266WiFi.h>
 #include <WiFiClient.h>
 
+#include "claude/ClaudeScreen.h"
 #include "claude/ClaudeUsage.h"
 #include "claude/CrashLog.h"
+#include "config/ConfigManager.h"
 #include "web/Api.h"
 #include "web/ClaudePage.h"
+#include "web/IndexPage.h"
+
+extern ConfigManager configManager;
 
 namespace {
 void sendJson(Webserver* webserver, int code, const JsonDocument& doc) {
@@ -41,6 +46,8 @@ void putLimit(JsonObject target, const ClaudeLimit& limit) {
 
 void handleClaudePage(Webserver* webserver) { webserver->raw().send_P(HTTP_CODE_OK, "text/html", CLAUDE_PAGE_HTML); }
 
+void handleIndexPage(Webserver* webserver) { webserver->raw().send_P(HTTP_CODE_OK, "text/html", INDEX_PAGE_HTML); }
+
 void handleClaudeStatus(Webserver* webserver) {
     if (!requireBearerToken(webserver)) {
         return;
@@ -62,6 +69,7 @@ void handleClaudeStatus(Webserver* webserver) {
     doc["free_heap"] = ESP.getFreeHeap();             // NOLINT(readability-static-accessed-through-instance)
     doc["max_free_block"] = ESP.getMaxFreeBlockSize();  // NOLINT(readability-static-accessed-through-instance)
     doc["has_refresh_token"] = ClaudeUsage::hasRefreshToken();
+    doc["layout"] = ClaudeScreen::layout();
     doc["uptime_s"] = millis() / 1000;
     doc["reset_reason"] = ESP.getResetReason();  // NOLINT(readability-static-accessed-through-instance)
     doc["reset_info"] = ESP.getResetInfo();      // NOLINT(readability-static-accessed-through-instance)
@@ -124,6 +132,32 @@ void handleClaudeRefresh(Webserver* webserver) {
     doc["message"] = "Fetch scheduled";
     sendJson(webserver, HTTP_CODE_OK, doc);
 }
+void handleClaudeLayout(Webserver* webserver) {
+    if (!requireBearerToken(webserver)) {
+        return;
+    }
+    JsonDocument body;
+    if (!parseBody(webserver, body) || !body["layout"].is<int>()) {
+        sendError(webserver, HTTP_CODE_BAD_REQUEST, "Missing layout");
+        return;
+    }
+    const int layout = body["layout"].as<int>();
+    if (layout < 0 || layout >= ClaudeScreen::LAYOUT_COUNT) {
+        sendError(webserver, HTTP_CODE_BAD_REQUEST, "Unknown layout");
+        return;
+    }
+    configManager.claude_layout = static_cast<uint8_t>(layout);
+    ClaudeScreen::setLayout(configManager.claude_layout);
+    if (!configManager.save()) {
+        sendError(webserver, HTTP_CODE_INTERNAL_ERROR, "Failed to save config");
+        return;
+    }
+    JsonDocument doc;
+    doc["status"] = "ok";
+    doc["layout"] = layout;
+    sendJson(webserver, HTTP_CODE_OK, doc);
+}
+
 // Connectivity check from the device's point of view, to tell DNS, routing and HTTP problems apart
 void handleClaudeDiag(Webserver* webserver) {
     if (!requireBearerToken(webserver)) {
@@ -178,8 +212,11 @@ void handleClaudeDiag(Webserver* webserver) {
  * @return void
  */
 void registerClaudeEndpoints(Webserver* webserver) {
-    // Served from flash so it works without a filesystem update
+    // Served from flash so it works without a filesystem update. The home page is overridden as well so the
+    // menu links to /claude even when the filesystem still holds the upstream index.html.
     webserver->raw().on("/claude", HTTP_GET, [webserver]() { handleClaudePage(webserver); });
+    webserver->raw().on("/", HTTP_GET, [webserver]() { handleIndexPage(webserver); });
+    webserver->raw().on("/index.html", HTTP_GET, [webserver]() { handleIndexPage(webserver); });
 
     // @openapi {get} /claude/status version=v1 group=Claude summary="Get Claude usage and login state"
     // requiresAuth=true responses=200:application/json,401:application/json
@@ -203,6 +240,11 @@ void registerClaudeEndpoints(Webserver* webserver) {
     // @openapi {get} /claude/diag version=v1 group=Claude summary="Network diagnostics" requiresAuth=true
     // responses=200:application/json,401:application/json
     webserver->raw().on("/api/v1/claude/diag", HTTP_GET, [webserver]() { handleClaudeDiag(webserver); });
+
+    // @openapi {post} /claude/layout version=v1 group=Claude summary="Select the screen layout (0 rings, 1 bars)"
+    // requiresAuth=true requestBody=application/json requestBodySchema=layout:integer example={"layout":1}
+    // responses=200:application/json,400:application/json,401:application/json
+    webserver->raw().on("/api/v1/claude/layout", HTTP_POST, [webserver]() { handleClaudeLayout(webserver); });
 
     // @openapi {post} /claude/refresh version=v1 group=Claude summary="Fetch usage now" requiresAuth=true
     // responses=200:application/json,401:application/json

@@ -5,6 +5,7 @@
 #include <U8g2lib.h>  // only for the font data, Arduino_GFX renders it
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <ctime>
 
 #include "claude/ClaudeUsage.h"
@@ -20,6 +21,8 @@ constexpr uint16_t COLOR_BG = 0x0000;
 constexpr uint16_t COLOR_TEXT = 0xFFFF;
 constexpr uint16_t COLOR_MUTED = 0x94B2;
 constexpr uint16_t COLOR_TRACK = 0x2124;
+constexpr uint16_t COLOR_CARD = 0x18E3;
+constexpr uint16_t COLOR_BAR = 0x39E7;
 constexpr uint16_t COLOR_CLAUDE = 0xDBAA;
 constexpr uint16_t COLOR_OK = 0x362B;
 constexpr uint16_t COLOR_WARN = 0xFD84;
@@ -28,10 +31,13 @@ constexpr uint16_t COLOR_CRIT = 0xFA27;
 constexpr float WARN_PERCENT = 70.0F;
 constexpr float CRIT_PERCENT = 90.0F;
 constexpr size_t TEXT_BUF = 40;
+constexpr long SESSION_WINDOW_S = 5L * 3600;
+constexpr long WEEKLY_WINDOW_S = 7L * 86400;
 
 String ip;
 bool active = false;
 bool gifWasPlaying = false;
+uint8_t currentLayout = ClaudeScreen::LAYOUT_RINGS;
 uint32_t drawnRevision = UINT32_MAX;
 time_t drawnMinute = 0;
 
@@ -45,6 +51,12 @@ constexpr std::array<int16_t, 2> RING_X = {62, 178};
 constexpr int16_t LABEL_Y = 158;
 constexpr int16_t RESET_Y = 177;
 constexpr int16_t FOOTER_Y = 228;
+constexpr int16_t CARD_X = 6;
+constexpr int16_t CARD_W = 228;
+constexpr int16_t CARD_H = 88;
+constexpr int16_t CARD_PAD = 10;
+constexpr std::array<int16_t, 2> CARD_Y = {32, 124};
+constexpr int16_t BAR_H = 12;
 
 auto gfx() -> Arduino_GFX* { return DisplayManager::getGfx(); }
 
@@ -88,6 +100,19 @@ void drawLeft(const char* text, int16_t xPos, int16_t baseline, const uint8_t* f
     lcd->print(text);
 }
 
+void drawRight(const char* text, int16_t rightX, int16_t baseline, const uint8_t* font, uint16_t color) {
+    auto* lcd = gfx();
+    lcd->setFont(font);
+    int16_t boundX = 0;
+    int16_t boundY = 0;
+    uint16_t width = 0;
+    uint16_t height = 0;
+    lcd->getTextBounds(text, 0, baseline, &boundX, &boundY, &width, &height);
+    lcd->setTextColor(color);
+    lcd->setCursor(rightX - static_cast<int16_t>(width) - boundX, baseline);
+    lcd->print(text);
+}
+
 auto colorFor(const ClaudeLimit& limit) -> uint16_t {
     if (limit.percent >= CRIT_PERCENT) {
         return COLOR_CRIT;
@@ -98,23 +123,36 @@ auto colorFor(const ClaudeLimit& limit) -> uint16_t {
     return COLOR_OK;
 }
 
+void formatDuration(long seconds, char* out, size_t len) {
+    const long days = seconds / 86400;
+    const long hours = (seconds % 86400) / 3600;
+    const long minutes = (seconds % 3600) / 60;
+    if (days > 0) {
+        snprintf(out, len, "%ldd %ldh", days, hours);
+    } else if (hours > 0) {
+        snprintf(out, len, "%ldh %02ldm", hours, minutes);
+    } else {
+        snprintf(out, len, "%ld min", minutes);
+    }
+}
+
 void formatCountdown(time_t target, char* out, size_t len) {
-    const time_t now = time(nullptr);
     if (target <= 0) {
         snprintf(out, len, "--");
         return;
     }
-    const long remaining = std::max<long>(0, static_cast<long>(target - now));
-    const long days = remaining / 86400;
-    const long hours = (remaining % 86400) / 3600;
-    const long minutes = (remaining % 3600) / 60;
-    if (days > 0) {
-        snprintf(out, len, "in %ldd %ldh", days, hours);
-    } else if (hours > 0) {
-        snprintf(out, len, "in %ldh %02ldm", hours, minutes);
-    } else {
-        snprintf(out, len, "in %ld min", minutes);
+    std::array<char, TEXT_BUF> duration{};
+    formatDuration(std::max<long>(0, static_cast<long>(target - time(nullptr))), duration.data(), duration.size());
+    snprintf(out, len, "in %s", duration.data());
+}
+
+// Share of the limit window that has already passed (0..1), negative when the reset time is unknown
+auto elapsedFraction(const ClaudeLimit& limit, long windowS) -> float {
+    if (!limit.valid || limit.resetsAt <= 0) {
+        return -1.0F;
     }
+    const auto remaining = static_cast<float>(limit.resetsAt - time(nullptr));
+    return std::min(std::max(1.0F - (remaining / static_cast<float>(windowS)), 0.0F), 1.0F);
 }
 
 void formatWeekday(time_t target, char* out, size_t len) {
@@ -175,6 +213,94 @@ void drawResetLine() {
     drawCentered(text.data(), RING_X[1], RESET_Y, u8g2_font_fur11_tr, COLOR_TEXT);
 }
 
+// Projects the current rate to the reset: either the limit lasts, or it runs out after the returned duration
+void formatProjection(const ClaudeLimit& limit, float elapsed, long windowS, char* out, size_t len,
+                      uint16_t& color) {
+    const float used = std::min(std::max(limit.percent, 0.0F), 100.0F);
+    const float elapsedS = elapsed * static_cast<float>(windowS);
+    const float remainingS = static_cast<float>(windowS) - elapsedS;
+    color = COLOR_OK;
+    if (used >= 100.0F) {
+        color = COLOR_CRIT;
+        snprintf(out, len, "Limit erreicht");
+        return;
+    }
+    if (used < 0.5F || elapsedS < 60.0F) {
+        snprintf(out, len, "reicht bis Reset");
+        return;
+    }
+    const float toFullS = (100.0F - used) * elapsedS / used;
+    if (toFullS >= remainingS) {
+        snprintf(out, len, "reicht bis Reset");
+        return;
+    }
+    color = colorFor(limit) == COLOR_CRIT ? COLOR_CRIT : COLOR_WARN;
+    std::array<char, TEXT_BUF> duration{};
+    formatDuration(static_cast<long>(toFullS), duration.data(), duration.size());
+    snprintf(out, len, "leer in %s", duration.data());
+}
+
+void drawBarCard(size_t idx, const ClaudeLimit& limit, const char* label, long windowS) {
+    auto* lcd = gfx();
+    const int16_t top = CARD_Y[idx];
+    const int16_t left = CARD_X + CARD_PAD;
+    const int16_t right = CARD_X + CARD_W - CARD_PAD;
+    const int16_t barW = right - left;
+    const int16_t barY = top + 36;
+    lcd->fillRoundRect(CARD_X, top, CARD_W, CARD_H, 6, COLOR_CARD);
+    drawLeft(label, left, top + 20, u8g2_font_helvB10_tr, COLOR_MUTED);
+    lcd->fillRect(left, barY, barW, BAR_H, COLOR_BAR);
+
+    if (!limit.valid) {
+        drawRight("--", right, top + 28, u8g2_font_fur20_tr, COLOR_TEXT);
+        return;
+    }
+
+    const float used = std::min(std::max(limit.percent, 0.0F), 100.0F);
+    std::array<char, TEXT_BUF> text{};
+    snprintf(text.data(), text.size(), "%d%%", static_cast<int>(limit.percent + 0.5F));
+    drawRight(text.data(), right, top + 28, u8g2_font_fur20_tr, COLOR_TEXT);
+
+    const auto fillW = static_cast<int16_t>(static_cast<float>(barW) * used / 100.0F);
+    if (fillW > 0) {
+        lcd->fillRect(left, barY, fillW, BAR_H, colorFor(limit));
+    }
+
+    // Pace marker: where usage would be if spread evenly over the window
+    const float elapsed = elapsedFraction(limit, windowS);
+    if (elapsed >= 0.0F) {
+        const auto markX = static_cast<int16_t>(left + static_cast<int16_t>(static_cast<float>(barW) * elapsed) - 1);
+        lcd->fillRect(std::min<int16_t>(std::max(markX, left), right - 3), barY - 3, 3, BAR_H + 6, COLOR_TEXT);
+    }
+
+    snprintf(text.data(), text.size(), "%d%% frei", static_cast<int>(100.0F - used + 0.5F));
+    drawLeft(text.data(), left, top + 64, u8g2_font_helvR10_tr, COLOR_TEXT);
+    std::array<char, TEXT_BUF> countdown{};
+    formatCountdown(limit.resetsAt, countdown.data(), countdown.size());
+    snprintf(text.data(), text.size(), "Reset %s", countdown.data());
+    drawRight(text.data(), right, top + 64, u8g2_font_helvR10_tr, COLOR_MUTED);
+
+    if (elapsed < 0.0F) {
+        return;
+    }
+    const float reserve = (elapsed * 100.0F) - used;
+    const uint16_t paceColor = reserve >= 0.0F ? COLOR_OK : COLOR_WARN;
+    lcd->fillCircle(left + 3, top + 79, 3, paceColor);
+    snprintf(text.data(), text.size(), reserve >= 0.0F ? "%d%% Reserve" : "%d%% zu schnell",
+             static_cast<int>(std::fabs(reserve) + 0.5F));
+    drawLeft(text.data(), left + 10, top + 83, u8g2_font_helvR08_tr, paceColor);
+
+    uint16_t projColor = COLOR_OK;
+    formatProjection(limit, elapsed, windowS, text.data(), text.size(), projColor);
+    drawRight(text.data(), right, top + 83, u8g2_font_helvR08_tr, projColor);
+}
+
+void drawBarCards() {
+    const ClaudeUsageData& usage = ClaudeUsage::data();
+    drawBarCard(0, usage.session, "5 Stunden", SESSION_WINDOW_S);
+    drawBarCard(1, usage.weekly, "Woche", WEEKLY_WINDOW_S);
+}
+
 void drawFooter() {
     gfx()->fillRect(0, FOOTER_Y - 12, 240, 16, COLOR_BG);
     std::array<char, TEXT_BUF * 2> text{};
@@ -231,6 +357,9 @@ void drawFull() {
         } else {
             drawMessage("Lade Usage...", ClaudeUsage::lastError().c_str(), nullptr);
         }
+    } else if (currentLayout == ClaudeScreen::LAYOUT_BARS) {
+        drawBarCards();
+        drawFooter();
     } else {
         drawRing(0, usage.session, "5 Stunden");
         drawRing(1, usage.weekly, "Woche");
@@ -245,7 +374,11 @@ void drawMinuteTick() {
     drawHeader();
     if (ClaudeUsage::data().fetchedAt > 0 && ClaudeUsage::state() != ClaudeState::LoggedOut &&
         ClaudeUsage::state() != ClaudeState::ReloginNeeded) {
-        drawResetLine();
+        if (currentLayout == ClaudeScreen::LAYOUT_BARS) {
+            drawBarCards();  // the pace marker and projection move with time
+        } else {
+            drawResetLine();
+        }
         drawFooter();
     }
     endText();
@@ -260,6 +393,13 @@ void ClaudeScreen::begin(const String& deviceIp) {
 }
 
 void ClaudeScreen::invalidate() { drawnRevision = UINT32_MAX; }
+
+void ClaudeScreen::setLayout(uint8_t newLayout) {
+    currentLayout = newLayout < LAYOUT_COUNT ? newLayout : LAYOUT_RINGS;
+    invalidate();
+}
+
+auto ClaudeScreen::layout() -> uint8_t { return currentLayout; }
 
 void ClaudeScreen::update() {
     if (!active) {

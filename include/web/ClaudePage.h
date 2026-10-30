@@ -21,8 +21,8 @@ static const char CLAUDE_PAGE_HTML[] PROGMEM = R"HTML(<!doctype html>
 <script>
 function claudeHandler() {
   return {
-    hasToken: !!localStorage.getItem("Authorization"),
-    s: null, url: "", code: "", scope: "user:profile", msg: "", busy: false, timer: null,
+    hasToken: !!localStorage.getItem("Authorization"), tokenRejected: false,
+    s: null, url: "", code: "", scope: "user:profile", msg: "", busy: false, timer: null, layout: 0,
     async init() {
       if (!this.hasToken) return;
       await this.load();
@@ -31,13 +31,18 @@ function claudeHandler() {
     async call(path, body) {
       const opts = body === undefined ? {} : { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) };
       const r = await apiFetch(path, opts);
+      this.tokenRejected = r.status === 401;
       const j = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(j.message || ("HTTP " + r.status));
       return j;
     },
     async load() {
-      try { this.s = await this.call("/api/v1/claude/status"); }
+      try { this.s = await this.call("/api/v1/claude/status"); this.layout = this.s.layout || 0; }
       catch (e) { this.msg = "Status: " + e.message; }
+    },
+    async saveLayout() {
+      try { await this.call("/api/v1/claude/layout", { layout: this.layout }); this.msg = "Layout gespeichert."; }
+      catch (e) { this.msg = "Layout: " + e.message; }
     },
     async start() {
       this.busy = true; this.msg = "";
@@ -87,8 +92,9 @@ function claudeHandler() {
 <section x-data="claudeHandler()" x-init="init()">
   <h2>Claude Usage</h2>
 
-  <template x-if="!hasToken">
-    <p>Bitte zuerst den API-Token auf der <a href="./token.html">Token-Seite</a> hinterlegen.</p>
+  <template x-if="!hasToken || tokenRejected">
+    <p>Das Geraet lehnt den API-Token dieses Browsers ab oder es ist keiner gespeichert. Bitte den aktuellen
+      Token auf der <a href="./token.html">Token-Seite</a> eintragen und speichern.</p>
   </template>
 
   <template x-if="s">
@@ -105,6 +111,18 @@ function claudeHandler() {
         <button type="button" class="secondary" @click="refresh()">Jetzt abrufen</button>
         <button type="button" class="contrast" @click="logout()">Abmelden</button>
       </div>
+    </article>
+  </template>
+
+  <template x-if="s">
+    <article>
+      <label for="claude-layout"><strong>Layout auf dem Display</strong></label>
+      <select id="claude-layout" x-model.number="layout" @change="saveLayout()">
+        <option value="0">Ringe</option>
+        <option value="1">Balken mit Tempo-Markierung</option>
+      </select>
+      <small>Bei den Balken zeigt der weisse Strich, wie viel Zeit des Fensters schon vergangen ist.
+        Liegt der Balken links davon, bist du langsamer als gleichmaessig verteilt (Reserve).</small>
     </article>
   </template>
 
