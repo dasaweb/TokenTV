@@ -4,7 +4,8 @@
 
 TokenTV turns a ~$20 GeekMagic SmallTV Ultra (or HelloCubic Lite) into a desk gauge for your Claude Pro/Max
 limits. The ESP8266 inside logs in to your Claude account itself, refreshes its own tokens and polls the usage
-endpoint over TLS. Two rings show the 5-hour session window and the weekly limit, with reset countdowns.
+endpoint over TLS. It shows the 5-hour session window and the weekly limit, with reset times, either as two
+rings or as bars with a pace marker.
 
 It is built on top of the [GeekMagic Open Firmware](https://github.com/Times-Z/GeekMagic-Open-Firmware) by
 Times-Z, so you keep its web UI, OTA updates, GIF player and rescue mode.
@@ -23,18 +24,40 @@ Times-Z, so you keep its web UI, OTA updates, GIF player and rescue mode.
  └──────────────────────────────┘
 ```
 
+The bar layout adds a pace marker (how much of the window has passed), the reserve against an even pace and a
+projection whether the limit lasts until the reset:
+
+```
+ ┌──────────────────────────────┐
+ │ ● Claude               22:47 │
+ │ ──────────────────────────── │
+ │ 5 Stunden               31%  │
+ │ ██████░░░░░░░│░░░░░░░░░░░░░  │
+ │ 69% frei       Reset in 2h 14m│
+ │ ● 24% Reserve  reicht bis Reset│
+ │ Woche                   23%  │
+ │ ████░░░│░░░░░░░░░░░░░░░░░░░  │
+ │ 77% frei       Reset in 4d 12h│
+ │ ● 9% Reserve   reicht bis Reset│
+ │   aktualisiert vor 2 min     │
+ └──────────────────────────────┘
+```
+
 ## Features
 
 - **Standalone:** on-device OAuth login (PKCE) with automatic token refresh. Your Claude Code session on the PC
   is not touched; the device gets its own token pair.
 - **Live usage:** polls every 5 minutes, honours `Retry-After`, backs off on errors.
-- **Ring gauges:** 5-hour session and weekly limit, green / amber / red (amber also when the server reports a
-  warning severity).
+- **Two layouts:** ring gauges, or bars with a pace marker, reserve and a projection to the reset. Both are
+  green / amber / red (amber also when the server reports a warning severity). Switch on the `/claude` page.
 - **Reset times:** countdown for the session window, weekday and time for the weekly reset (local time zone).
+  The API reports e.g. `10:59:59.95`; times are rounded to the minute and snapped to a quarter hour when within
+  two minutes, so this shows as 11:00.
 - **Proper TLS:** certificates are validated against pinned root CAs (GTS Root R4, ISRG Root X1/X2).
 - **Fits into 80 KB of RAM:** see [Memory notes](#memory-notes) for what it took.
-- **Web page** at `http://<device>/claude` for login, status, manual refresh and logout. It is served from
-  flash, so no filesystem update is needed.
+- **Web page** at `http://<device>/claude` for login, status, layout, manual refresh and logout. It is served
+  from flash, so no filesystem update is needed. The home page is served from flash too, so the menu has a
+  *Claude Usage* entry even with the upstream filesystem image.
 
 ## Hardware
 
@@ -95,6 +118,8 @@ Until you log in, the display shows the login URL.
 | Poll interval      | `FETCH_INTERVAL_MS` in `src/claude/ClaudeUsage.cpp` | 5 min                     |
 | OAuth scope        | *Erweitert* on the login page                  | `user:profile` (enough for usage) |
 | Warn / critical    | `WARN_PERCENT` / `CRIT_PERCENT` in `src/claude/ClaudeScreen.cpp` | 70 % / 90 %  |
+| Layout             | `/claude` page, stored as `claude_layout` in `config.json` (0 rings, 1 bars) | rings |
+| Pace windows       | `SESSION_WINDOW_S` / `WEEKLY_WINDOW_S` in `src/claude/ClaudeScreen.cpp` | 5 h / 7 d |
 
 ## API
 
@@ -103,7 +128,8 @@ All endpoints need `Authorization: Bearer <API_TOKEN>`, except the page itself.
 | Method | Path                         | Purpose                                                    |
 | ------ | ---------------------------- | ---------------------------------------------------------- |
 | GET    | `/claude`                    | Login and status page                                      |
-| GET    | `/api/v1/claude/status`      | State, usage, token expiry, heap, last reset and crash record |
+| GET    | `/api/v1/claude/status`      | State, usage, layout, token expiry, heap, last reset and crash record |
+| POST   | `/api/v1/claude/layout`      | Select the screen layout (`{"layout":0}` rings, `1` bars), saved in `config.json` |
 | POST   | `/api/v1/claude/login/start` | Starts a PKCE login, returns the authorize URL (`{"scope":...}` optional) |
 | POST   | `/api/v1/claude/login/finish`| Queues the pasted code; the exchange runs in the background (`login_error` in status) |
 | POST   | `/api/v1/claude/refresh`     | Fetch usage now                                            |
@@ -151,6 +177,7 @@ Typical numbers: about 30 KB free heap idle, and TLS calls succeed repeatedly.
 | Device reboots | Read `last_crash` in status and decode with `xtensa-lx106-elf-addr2line -pfiaC -e .pio/build/esp12e/firmware.elf <addrs>`. |
 | `HTTP 403` on usage | Scope too narrow. Log in again with `user:profile user:inference` (login page → *Erweitert*). |
 | `Login abgelaufen` on the display | The refresh token was revoked. Log in again. |
+| Web pages show no data, log has `Unauthorized request` | The browser holds an old API token. On *API Token*, enter the current token in the top field and click **Save**. *Change Token* changes the token on the device and needs the old one. |
 
 ## Changes to the base firmware
 
@@ -162,6 +189,8 @@ firmware:
 - CPU runs at 160 MHz for faster TLS.
 - *GFX Library for Arduino* is pinned to 1.6.4, and its YCbCr tables are moved to PROGMEM.
 - Secure storage frees its EEPROM buffer when idle.
+- `/` and `/index.html` are served from flash (`include/web/IndexPage.h`, a copy of `data/web/index.html`).
+- `config.json` has an extra `claude_layout` field.
 
 ## Disclaimer
 
